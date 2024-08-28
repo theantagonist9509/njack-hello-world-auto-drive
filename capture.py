@@ -36,7 +36,7 @@ def region_select(image):
 
 def hough_transform(image):
     rho = 1             
-    theta = np.pi/180   
+    theta = pi / 180   
     threshold = 20      
     minLineLength = 20  
     maxLineGap = 500    
@@ -116,9 +116,9 @@ def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=12):
     return cv2.addWeighted(image, 1.0, line_image, 1.0, 0.0)
 
 def transform(point):
-    neg_pitch = 0
-    h = 30
-    f = 24
+    neg_pitch = 0.13 * pi
+    h = 1000
+    f = 0.5 * w
 
     x, y = point
     x -= h / 2
@@ -187,6 +187,8 @@ while True:
     tf_r_p1 = transform(r_p1)
 
     pred.append(angle(tf_l_p0, tf_l_p1) + angle(tf_r_p0, tf_r_p1) - pi)
+    print(str(angle(tf_l_p0, tf_l_p1)) + ', ' + str(angle(tf_r_p0, tf_r_p1)))
+    #print(str(tf_l_p0) + str(tf_l_p1))
 
     lines = lane_lines(masked, avg_slope_intercepts)
     res = draw_lane_lines(gray, lines)
