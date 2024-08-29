@@ -17,8 +17,8 @@ w = 960
 
 def region_select(image):
     mask = np.zeros_like(image)   
-
     rows, cols = image.shape[:2]
+
     #bottom_left  = [0, rows]
     #top_left     = [0, rows * 0.5]
     #bottom_right = [cols, rows]
@@ -27,11 +27,12 @@ def region_select(image):
     top_left = [0.45 * cols, 0.65 * rows]
     bottom_right     = [0.8 * cols, rows]
     top_right    = [0.65 * cols, 0.65 * rows]
+
     vertices = np.array([[bottom_left, top_left, top_right, bottom_right]], dtype=np.int32)
 
     cv2.fillPoly(mask, vertices, 255)
-
     masked_image = cv2.bitwise_and(image, mask)
+
     return masked_image
 
 def hough_transform(image):
@@ -91,7 +92,7 @@ def pixel_points(y1, y2, line):
     y2 = int(y2)
     return ((x1, y1), (x2, y2))
 
-def lane_lines(image, avg):
+def get_lane_lines(image, avg):
     if avg is None:
         return None
 
@@ -103,7 +104,7 @@ def lane_lines(image, avg):
 
     return left_line, right_line
 
-def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=12):
+def draw_lane_lines(image, lines):
     if lines is None:
         return image
 
@@ -111,7 +112,16 @@ def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=12):
 
     for line in lines:
         if line is not None:
-            cv2.line(line_image, *line, color, thickness=thickness)
+            cv2.line(line_image, *line, color=[0, 255, 0], thickness=2)
+
+    return cv2.addWeighted(image, 1.0, line_image, 1.0, 0.0)
+
+def draw_steering_line(image, angle):
+    angle *= 5
+    line_len = 0.05 * w
+
+    line_image = np.zeros_like(image)
+    cv2.arrowedLine(line_image, (int(w / 2), int(h / 2)), (int(w / 2 - line_len * sin(angle)), int(h / 2 - line_len * cos(angle))), color=[0, 255, 0], thickness=2, tipLength=0.5)
 
     return cv2.addWeighted(image, 1.0, line_image, 1.0, 0.0)
 
@@ -144,7 +154,7 @@ def distance(p0, p1):
 
     return sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
 
-# exponential smoothening over viewport lane angles
+# exponential smoothening over viewport lane lines
 slope_alpha = 0.9
 intercept_alpha = 0.9
 avg_slope_intercepts = None
@@ -155,7 +165,9 @@ c = m * 0.13
 
 pred = []
 angle_diff = []
-line_dist = []
+lane_dist = []
+
+#out = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 90, (w, h))
 
 while True:
     ret, frame = cap.read()
@@ -210,13 +222,13 @@ while True:
     d0 = distance(tf_l_p0, tf_r_p0)
     d1 = distance(tf_l_p1, tf_r_p1)
     avg_d = (d0 + d1) / 2
-    line_dist.append(avg_d * cos(abs(pred_angle)) / (w * 10))
+    lane_dist.append(avg_d * cos(abs(pred_angle)) / (w * 10))
 
-    lines = lane_lines(masked, avg_slope_intercepts)
-    res = draw_lane_lines(gray, lines)
+    lane_lines = get_lane_lines(masked, avg_slope_intercepts)
+    res = draw_steering_line(draw_lane_lines(resized, lane_lines), pred_angle)
 
-    cv2.imshow('masked', masked)
     cv2.imshow('frame', res)
+    #out.write(res)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
@@ -227,7 +239,8 @@ cv2.destroyAllWindows()
 fig, ax = plt.subplots()
 ax.plot(range(len(pred)), pred, label='avg angle')
 ax.plot(range(len(angle_diff)), angle_diff, label='angle diff')
-ax.plot(range(len(line_dist)), line_dist, label='line dist')
+ax.plot(range(len(lane_dist)), lane_dist, label='lane dist')
 
 ax.legend()
+plt.title('lane regression data')
 plt.show()
