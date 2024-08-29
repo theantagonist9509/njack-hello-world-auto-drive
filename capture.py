@@ -116,19 +116,19 @@ def draw_lane_lines(image, lines, color=[255, 0, 0], thickness=12):
     return cv2.addWeighted(image, 1.0, line_image, 1.0, 0.0)
 
 def transform(point):
-    neg_pitch = 0.13 * pi
-    h = 1000
-    f = 0.5 * w
+    neg_pitch = 0.12 * pi
+    cam_height = w
+    focal_len= 0.5 * w
 
     x, y = point
-    x -= h / 2
-    y = h / 2 - y
+    x -= cam_height / 2
+    y = cam_height / 2 - y
 
-    theta = neg_pitch - atan(y / f)
+    theta = neg_pitch - atan(y / focal_len)
     cot = cos(theta) / sin(theta)
-    y_ret = h * cot
-    l = sqrt(h * h + y_ret * y_ret)
-    x_ret = l * x / f
+    y_ret = cam_height * cot
+    l = sqrt(cam_height ** 2 + y_ret ** 2)
+    x_ret = l * x / focal_len
 
     return x_ret, y_ret
 
@@ -138,11 +138,24 @@ def angle(p0, p1):
 
     return atan2(y1 - y0, x1 - x0)
 
+def distance(p0, p1):
+    x0, y0 = p0
+    x1, y1 = p1
+
+    return sqrt((x1 - x0) ** 2 + (y1 - y0) ** 2)
+
+# exponential smoothening over viewport lane angles
 slope_alpha = 0.9
 intercept_alpha = 0.9
 avg_slope_intercepts = None
 
+# linear regression over mean ground lane angle
+m = 1
+c = m * 0.13
+
 pred = []
+angle_diff = []
+line_dist = []
 
 while True:
     ret, frame = cap.read()
@@ -186,9 +199,18 @@ while True:
     tf_r_p0 = transform(r_p0)
     tf_r_p1 = transform(r_p1)
 
-    pred.append(angle(tf_l_p0, tf_l_p1) + angle(tf_r_p0, tf_r_p1) - pi)
-    print(str(angle(tf_l_p0, tf_l_p1)) + ', ' + str(angle(tf_r_p0, tf_r_p1)))
-    #print(str(tf_l_p0) + str(tf_l_p1))
+    l_angle = m * (angle(tf_l_p0, tf_l_p1) - pi / 2) + c
+    r_angle = m * (angle(tf_r_p0, tf_r_p1) - pi / 2) + c
+
+    pred_angle = (l_angle + r_angle) / 2
+    pred.append(pred_angle)
+
+    angle_diff.append(l_angle - r_angle)
+
+    d0 = distance(tf_l_p0, tf_r_p0)
+    d1 = distance(tf_l_p1, tf_r_p1)
+    avg_d = (d0 + d1) / 2
+    line_dist.append(avg_d * cos(abs(pred_angle)) / (w * 10))
 
     lines = lane_lines(masked, avg_slope_intercepts)
     res = draw_lane_lines(gray, lines)
@@ -203,6 +225,9 @@ cap.release()
 cv2.destroyAllWindows()
 
 fig, ax = plt.subplots()
-ax.plot(range(len(pred)), pred)
+ax.plot(range(len(pred)), pred, label='avg angle')
+ax.plot(range(len(angle_diff)), angle_diff, label='angle diff')
+ax.plot(range(len(line_dist)), line_dist, label='line dist')
 
+ax.legend()
 plt.show()
