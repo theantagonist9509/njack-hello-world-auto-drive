@@ -128,7 +128,7 @@ def draw_steering_line(image, angle):
 def transform(point):
     neg_pitch = 0.12 * pi
     cam_height = w
-    focal_len= 0.5 * w
+    focal_len = 0.5 * w
 
     x, y = point
     x -= cam_height / 2
@@ -222,7 +222,7 @@ while True:
     d0 = distance(tf_l_p0, tf_r_p0)
     d1 = distance(tf_l_p1, tf_r_p1)
     avg_d = (d0 + d1) / 2
-    lane_dist.append(avg_d * cos(abs(pred_angle)) / (w * 10))
+    lane_dist.append(avg_d * cos(pred_angle) / (w * 10))
 
     lane_lines = get_lane_lines(masked, avg_slope_intercepts)
     res = draw_steering_line(draw_lane_lines(resized, lane_lines), pred_angle)
