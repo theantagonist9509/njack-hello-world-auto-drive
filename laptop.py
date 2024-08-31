@@ -4,25 +4,15 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-#if (len(sys.argv) != 2):
-#    print('Error: Invalid arguments')
-#    sys.exit(1)
-#
-#addr = sys.argv[1]
-#cap = cv2.VideoCapture('rtsp://' + addr + '/h264_ulaw.sdp')
 cap = cv2.VideoCapture('test.mkv')
 
 h = 540
 w = 960
 
-def region_select(image):
+def regionSelect(image):
     mask = np.zeros_like(image)   
     rows, cols = image.shape[:2]
 
-    #bottom_left  = [0, rows]
-    #top_left     = [0, rows * 0.5]
-    #bottom_right = [cols, rows]
-    #top_right    = [cols, rows * 0.5]
     bottom_left  = [0.25 * cols, rows]
     top_left = [0.45 * cols, 0.65 * rows]
     bottom_right     = [0.8 * cols, rows]
@@ -35,7 +25,7 @@ def region_select(image):
 
     return masked_image
 
-def hough_transform(image):
+def houghTransform(image):
     rho = 1             
     theta = pi / 180   
     threshold = 20      
@@ -44,11 +34,11 @@ def hough_transform(image):
     return cv2.HoughLinesP(image, rho = rho, theta = theta, threshold = threshold,
                            minLineLength = minLineLength, maxLineGap = maxLineGap)
 
-def average_slope_intercept(lines):
-    left_lines    = [] #(slope, intercept)
-    left_weights  = [] #(length,)
-    right_lines   = [] #(slope, intercept)
-    right_weights = [] #(length,)
+def averageSlopeIntercept(lines):
+    left_lines    = [] # (slope, intercept)
+    left_weights  = [] # length
+    right_lines   = [] # (slope, intercept)
+    right_weights = [] # length
 
     if lines is None:
         return None
@@ -64,10 +54,10 @@ def average_slope_intercept(lines):
 
             if slope < 0:
                 left_lines.append((slope, intercept))
-                left_weights.append((length))
+                left_weights.append(length)
             else:
                 right_lines.append((slope, intercept))
-                right_weights.append((length))
+                right_weights.append(length)
 
     if left_weights == [] or right_weights == []:
         return None
@@ -77,7 +67,7 @@ def average_slope_intercept(lines):
 
     return left_lane, right_lane
 
-def pixel_points(y1, y2, line):
+def pixelPoints(y1, y2, line):
     if line is None:
         return None
 
@@ -92,19 +82,19 @@ def pixel_points(y1, y2, line):
     y2 = int(y2)
     return ((x1, y1), (x2, y2))
 
-def get_lane_lines(image, avg):
+def getLaneLines(image, avg):
     if avg is None:
         return None
 
     left_lane, right_lane = avg
     y1 = image.shape[0]
     y2 = y1 * 0.6
-    left_line  = pixel_points(y1, y2, left_lane)
-    right_line = pixel_points(y1, y2, right_lane)
+    left_line  = pixelPoints(y1, y2, left_lane)
+    right_line = pixelPoints(y1, y2, right_lane)
 
     return left_line, right_line
 
-def draw_lane_lines(image, lines):
+def drawLaneLines(image, lines):
     if lines is None:
         return image
 
@@ -116,7 +106,7 @@ def draw_lane_lines(image, lines):
 
     return cv2.addWeighted(image, 1.0, line_image, 1.0, 0.0)
 
-def draw_steering_line(image, angle):
+def drawExagSteeringArrow(image, angle):
     angle *= 5
     line_len = 0.05 * w
 
@@ -179,9 +169,9 @@ while True:
     gray = cv2.cvtColor(resized, cv2.COLOR_BGR2GRAY)
     blurred = cv2.blur(gray, (5, 5))
     edges = cv2.Canny(blurred, 75, 125)
-    masked = region_select(edges)
-    hough = hough_transform(masked)
-    new_avg_slope_intercepts = average_slope_intercept(hough)
+    masked = regionSelect(edges)
+    hough = houghTransform(masked)
+    new_avg_slope_intercepts = averageSlopeIntercept(hough)
 
     if new_avg_slope_intercepts is None:
         continue
@@ -224,8 +214,8 @@ while True:
     avg_d = (d0 + d1) / 2
     lane_dist.append(avg_d * cos(pred_angle) / (w * 10))
 
-    lane_lines = get_lane_lines(masked, avg_slope_intercepts)
-    res = draw_steering_line(draw_lane_lines(resized, lane_lines), pred_angle)
+    lane_lines = getLaneLines(masked, avg_slope_intercepts)
+    res = drawExagSteeringArrow(drawLaneLines(resized, lane_lines), pred_angle)
 
     cv2.imshow('frame', res)
     #out.write(res)
